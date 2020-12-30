@@ -30,7 +30,9 @@
 - Latest gdrive api used i.e v3
 - Pretty logging
 - Easy to install and update
-  - Auto update
+  - Self update
+  - [Auto update](#updation)
+  - Can be per-user and invoked per-shell, hence no root access required or global install with root access.
 - An additional sync script for background synchronisation jobs. Read [Synchronisation](#synchronisation) section for more info.
 
 ## Table of Contents
@@ -48,10 +50,12 @@
   - [Updation](#updation)
 - [Usage](#usage)
   - [Generating Oauth Credentials](#generating-oauth-credentials)
+  - [Enable Drive API](#enable-drive-api)
   - [First Run](#first-run)
+  - [Config file](#config)
   - [Upload](#upload)
   - [Upload Script Custom Flags](#upload-script-custom-flags)
-  - [Multiple Inputs](#multiple-inputs)
+  - [Multiple Inputs](#multiple-inputs)  
   - [Resuming Interrupted Uploads](#resuming-interrupted-uploads)
 - [Additional Usage](#additional-usage)
   - [Synchronisation](#synchronisation)
@@ -111,6 +115,7 @@ This repo contains two types of scripts, posix compatible and bash compatible.
 | sed              | Miscellaneous                                          |
 | mktemp           | To generate temporary files ( optional )               |
 | sleep            | Self explanatory                                       |
+| ps               | To manage different processes                          |
 
 <strong>If BASH is not available or BASH is available but version is less tham 4.x, then below programs are also required:</strong>
 
@@ -121,11 +126,10 @@ This repo contains two types of scripts, posix compatible and bash compatible.
 | cat                 | Miscellaneous                              |
 | stty or zsh or tput | To determine column size ( optional )      |
 
-<strong>These programs are needed for synchronisation script:</strong>
+<strong>These are the additional programs needed for synchronisation script:</strong>
 
 | Program       | Role In Script            |
 | ------------- | ------------------------- |
-| ps            | To manage background jobs |
 | tail          | To show indefinite logs   |
 
 ### Installation
@@ -152,8 +156,6 @@ Default values set by automatic installation script, which are changeable:
 
 **Shell file:** `.bashrc` or `.zshrc` or `.profile`
 
-**Config Path** `${HOME}/.googledrive.conf`
-
 For custom command names, repo, shell file, etc, see advanced installation method.
 
 **Now, for automatic install script, there are two ways:**
@@ -163,7 +165,7 @@ For custom command names, repo, shell file, etc, see advanced installation metho
 To install google-drive-upload in your system, you can run the below command:
 
 ```shell
-curl --compressed -s https://raw.githubusercontent.com/labbots/google-drive-upload/master/install.sh | sh -s
+curl --compressed -Ls https://github.com/labbots/google-drive-upload/raw/master/install.sh | sh -s
 ```
 
 and done.
@@ -181,6 +183,8 @@ These are the flags that are available in the install.sh script:
 -   <strong>-p | --path <dir_name></strong>
 
     Custom path where you want to install the script.
+
+    Note: For global installs, give path outside of the home dir like /usr/bin and it must be in the executable path already.
 
     ---
 
@@ -224,12 +228,6 @@ These are the flags that are available in the install.sh script:
 
     ---
 
--   <strong>-z | --config <config file path></strong>
-
-    Specify custom config file path, where credentials will be stored or loaded from.
-
-    ---
-
 -   <strong>--sh | --posix</strong>
 
     Force install posix scripts even if system has compatible bash binary present.
@@ -239,6 +237,12 @@ These are the flags that are available in the install.sh script:
 -   <strong>-q | --quiet</strong>
 
     Only show critical error/sucess logs.
+
+    ---
+
+-   <strong>-U | --uninstall</strong>
+
+    Uninstall the script and remove related files.\n
 
     ---
 
@@ -259,7 +263,7 @@ Now, run the script and use flags according to your usecase.
 E.g:
 
 ```shell
-curl --compressed -s https://raw.githubusercontent.com/labbots/google-drive-upload/master/install.sh | sh -s -- -r username/reponame -p somepath -s shell_file -c command_name -B branch_name
+curl --compressed -Ls https://github.com/labbots/google-drive-upload/raw/master/install.sh | sh -s -- -r username/reponame -p somepath -s shell_file -c command_name -B branch_name
 ```
 </details>
 
@@ -287,27 +291,45 @@ There are two methods:
 
     By default, script checks for update after 5 days. Use -t / --time flag of install.sh to modify the interval.
 
-    An update log is saved in `"${HOME}/.gdrive-downloader/update.log"`.
-
 **Note: Above methods always obey the values set by user in advanced installation,**
 **e.g if you have installed the script with different repo, say `myrepo/gdrive-upload`, then the update will be also fetched from the same repo.**
 
 ## Usage
 
-First, we need to obtain our Oauth credentials, here's how to do it:
+First, we need to obtain our oauth credentials, here's how to do it:
 
 ### Generating Oauth Credentials
 
-- Log into google developer console at [google console](https://console.developers.google.com/).
-- Create new Project or use existing project.
-- Creating new OAuth 2.0 Credentials:
-  - Select Application type "other".
-  - Provide name for the new credentials. ( anything )
-  - This would provide a new Client ID and Client Secret.
-  - Download your credentials.json by clicking on the download button.
-- Enable Google Drive API for the project under "Library".
+- Follow [Enable Drive API](#enable-drive-api) section.
+- Open [google console](https://console.developers.google.com/).
+- Click on "Credentials".
+- Click "Create credentials" and select oauth client id.
+- Select Application type "Desktop app" or "other".
+- Provide name for the new credentials. ( anything )
+- This would provide a new Client ID and Client Secret.
+- Download your credentials.json by clicking on the download button.
 
-Now, we have obtained our credentials, move to next section to use those credentials to setup:
+Now, we have obtained our credentials, move to the [First run](#first-run) section to use those credentials:
+
+### Enable Drive API
+
+- Log into google developer console at [google console](https://console.developers.google.com/).
+- Click select project at the right side of "Google Cloud Platform" of upper left of window.
+
+If you cannot see the project, please try to access to [https://console.cloud.google.com/cloud-resource-manager](https://console.cloud.google.com/cloud-resource-manager).
+
+You can also create new project at there. When you create a new project there, please click the left of "Google Cloud Platform". You can see it like 3 horizontal lines.
+
+By this, a side bar is opened. At there, select "API & Services" -> "Library". After this, follow the below steps:
+
+- Click "NEW PROJECT" and input the "Project Name".
+- Click "CREATE" and open the created project.
+- Click "Enable APIs and get credentials like keys".
+- Go to "Library"
+- Input "Drive API" in "Search for APIs & Services".
+- Click "Google Drive API" and click "ENABLE".
+
+[Go back to oauth credentials setup](#generating-oauth-credentials)
 
 ### First Run
 
@@ -327,6 +349,46 @@ If you don't have refresh token, script outputs a URL on the terminal script, op
 **Root Folder:** Gdrive folder url/id from your account which you want to set as root folder. You can leave it blank and it takes `root` folder as default.
 
 If everything went fine, all the required credentials have been set, read the next section on how to upload a file/folder.
+
+### Config
+
+After first run, the credentials are saved in config file. By default, the config file is `${HOME}/.googledrive.conf`.
+
+To change the default config file or use a different one temporarily, see `-z / --config` custom in [Upload Script Custom Flags](#upload-script-custom-flags).
+
+This is the format of a config file:
+
+```shell
+CLIENT_ID="client id"
+CLIENT_SECRET="client secret"
+REFRESH_TOKEN="refresh token"
+SYNC_DEFAULT_ARGS="default args of gupload command for gsync"
+ROOT_FOLDER_NAME="root folder name"
+ROOT_FOLDER="root folder id"
+ACCESS_TOKEN="access token"
+ACCESS_TOKEN_EXPIRY="access token expiry"
+```
+
+You can use a config file in multiple machines, the values that are explicitly required are `CLIENT_ID`, `CLIENT_SECRET` and `REFRESH_TOKEN`.
+
+If `ROOT_FOLDER` is not set, then it is asked if running in an interactive terminal, otherwise `root` is used.
+
+`ROOT_FOLDER_NAME`, `ACCESS_TOKEN` and `ACCESS_TOKEN_EXPIRY` are automatically generated using `REFRESH_TOKEN`.
+
+`SYNC_DEFAULT_ARGS` is optional.
+
+A pre-generated config file can be also used where interactive terminal access is not possible, like Continuous Integration, docker, jenkins, etc
+
+Just have to print values to `"${HOME}/.googledrive.conf"`, e.g:
+
+```shell
+printf "%s\n" "CLIENT_ID=\"client id\"
+CLIENT_SECRET=\"client secret\"
+REFRESH_TOKEN=\"refresh token\"
+" >| "${HOME}/.googledrive.conf"
+```
+
+Note: Don't skip those backslashes before the double qoutes, it's necessary to handle spacing.
 
 ### Upload
 
@@ -416,8 +478,8 @@ These are the custom flags that are currently implemented:
 
     For uploading multiple input into the same folder:
 
-    -   Use -C / --create-dir ( e.g `./upload.sh -f file1 -f folder1 -f file2 -C <folder_wherw_to_upload>` ) option.
-    -   Give two initial arguments which will use the second argument as the folder you wanna upload ( e.g: `./upload.sh filename <folder_where_to_upload> -f filename -f foldername` ).
+    - Use -C / --create-dir ( e.g `./upload.sh -f file1 -f folder1 -f file2 -C <folder_wherw_to_upload>` ) option.
+    - Give two initial arguments which will use the second argument as the folder you wanna upload ( e.g: `./upload.sh filename <folder_where_to_upload> -f filename -f foldername` ).
 
         This flag can also be used for uploading files/folders which have `-` character in their name, normally it won't work, because of the flags, but using `-f -[file|folder]namewithhyphen` works. Applies for -C/--create-dir too.
 
@@ -507,6 +569,12 @@ These are the custom flags that are currently implemented:
 -   <strong>-u | --update</strong>
 
     Update the installed script in your system, if not installed, then install.
+
+    ---
+
+-   <strong>--uninstall</strong>
+
+    Uninstall the script from your system.
 
     ---
 
@@ -810,7 +878,7 @@ There are two methods:
 1.  Run the installation script again with -U/--uninstall flag
 
     ```shell
-    curl --compressed -s https://raw.githubusercontent.com/labbots/google-drive-upload/master/install.sh | sh -s -- --uninstall
+    curl --compressed -Ls https://github.com/labbots/google-drive-upload/raw/master/install.sh | sh -s -- --uninstall
     ```
 
     Yes, just run the installation script again with the flag and voila, it's done.

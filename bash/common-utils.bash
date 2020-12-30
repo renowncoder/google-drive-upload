@@ -59,8 +59,7 @@ _check_debug() {
                 else
                     trap 'shopt -s checkwinsize; (:;:)' SIGWINCH
                 fi
-                CURL_PROGRESS="-#" EXTRA_LOG="_print_center" CURL_PROGRESS_EXTRA="-#"
-                export CURL_PROGRESS EXTRA_LOG CURL_PROGRESS_EXTRA
+                export CURL_PROGRESS="-#" EXTRA_LOG="_print_center" CURL_PROGRESS_EXTRA="-#" SUPPORT_ANSI_ESCAPES="true"
             else
                 _print_center() { { [[ $# = 3 ]] && printf "%s\n" "[ ${2} ]"; } || { printf "%s\n" "[ ${2}${3} ]"; }; }
                 _clear_line() { :; }
@@ -86,7 +85,7 @@ _check_debug() {
 _check_internet() {
     "${EXTRA_LOG}" "justify" "Checking Internet Connection.." "-"
     if ! _timeout 10 curl -Is google.com; then
-        _clear_line1
+        _clear_line 1
         "${QUIET:-_print_center}" "justify" "Error: Internet connection" " not available." "="
         exit 1
     fi
@@ -101,7 +100,7 @@ _check_internet() {
 # Result: Read description
 ###################################################
 _clear_line() {
-    printf "\033[%sA\033[2K" "${1}"
+    printf "\e[%sA\e[2K" "${1}"
 }
 
 ###################################################
@@ -159,41 +158,6 @@ _display_time() {
     [[ ${MIN} -gt 0 ]] && printf '%d minute(s) ' "${MIN}"
     [[ ${DAY} -gt 0 || ${HR} -gt 0 || ${MIN} -gt 0 ]] && printf 'and '
     printf '%d seconds\n' "${SEC}"
-}
-
-###################################################
-# Extract ID from a googledrive folder/file url.
-# Globals: None
-# Arguments: 1
-#   ${1} = googledrive folder/file url.
-# Result: print extracted ID
-###################################################
-_extract_id() {
-    [[ $# = 0 ]] && printf "%s: Missing arguments\n" "${FUNCNAME[0]}" && return 1
-    declare LC_ALL=C ID="${1}"
-    case "${ID}" in
-        *'drive.google.com'*'id='*) ID="${ID##*id=}" && ID="${ID%%\?*}" && ID="${ID%%\&*}" ;;
-        *'drive.google.com'*'file/d/'* | 'http'*'docs.google.com'*'/d/'*) ID="${ID##*\/d\/}" && ID="${ID%%\/*}" && ID="${ID%%\?*}" && ID="${ID%%\&*}" ;;
-        *'drive.google.com'*'drive'*'folders'*) ID="${ID##*\/folders\/}" && ID="${ID%%\?*}" && ID="${ID%%\&*}" ;;
-    esac
-    printf "%b" "${ID:+${ID}\n}"
-}
-
-###################################################
-# A small function generate final list for folder uploads
-# Globals: 1 variable, 1 function
-#   Variables - DIRIDS
-#   Functions - _dirname
-# Arguments: 1
-#   ${1} = filename
-# Result: read discription
-###################################################
-_gen_final_list() {
-    declare file="${1}" __rootdir
-    __rootdir="$(_dirname "${file}")"
-    printf "%s\n" "${__rootdir}|:_//_:|$(__temp="$(grep "|:_//_:|${__rootdir}|:_//_:|" <<< "${DIRIDS}" || :)" &&
-        printf "%s\n" "${__temp//"|:_//_:|"${__rootdir}*/}")|:_//_:|${file}"
-    return 0
 }
 
 ###################################################
@@ -316,7 +280,7 @@ _print_center() {
 # Result: return 1 or 0
 ###################################################
 _support_ansi_escapes() {
-    { [[ -t 2 && -n ${TERM} && ${TERM} =~ (xterm|rxvt|urxvt|linux|vt) ]] && return 0; } || return 1
+    { [[ -t 2 && -n ${TERM} && ${TERM} =~ (xterm|rxvt|urxvt|linux|vt|screen) ]] && return 0; } || return 1
 }
 
 ###################################################
@@ -355,10 +319,12 @@ _timeout() {
 ###################################################
 _update_config() {
     [[ $# -lt 3 ]] && printf "Missing arguments\n" && return 1
-    declare VALUE_NAME="${1}" VALUE="${2}" CONFIG_PATH="${3}"
-    ! [ -f "${CONFIG_PATH}" ] && : >| "${CONFIG_PATH}" # If config file doesn't exist.
-    printf "%s\n%s\n" "$(grep -v -e "^$" -e "^${VALUE_NAME}=" "${CONFIG_PATH}" || :)" \
-        "${VALUE_NAME}=\"${VALUE}\"" >| "${CONFIG_PATH}"
+    declare value_name="${1}" value="${2}" config_path="${3}"
+    ! [ -f "${config_path}" ] && : >| "${config_path}" # If config file doesn't exist.
+    chmod u+w "${config_path}"
+    printf "%s\n%s\n" "$(grep -v -e "^$" -e "^${value_name}=" "${config_path}" || :)" \
+        "${value_name}=\"${value}\"" >| "${config_path}"
+    chmod a-w-r-x,u+r "${config_path}"
 }
 
 ###################################################
@@ -382,6 +348,6 @@ _url_encode() {
                 printf '%%%02X' "'${_}"
                 ;;
         esac
-    done
+    done 2>| /dev/null
     printf '\n'
 }

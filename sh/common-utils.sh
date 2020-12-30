@@ -48,8 +48,7 @@ _check_debug() {
             if _support_ansi_escapes; then
                 ! COLUMNS="$(_get_columns_size)" || [ "${COLUMNS:-0}" -lt 45 ] 2>| /dev/null &&
                     _print_center() { { [ $# = 3 ] && printf "%s\n" "[ ${2} ]"; } || { printf "%s\n" "[ ${2}${3} ]"; }; }
-                CURL_PROGRESS="-#" EXTRA_LOG="_print_center" CURL_PROGRESS_EXTRA="-#"
-                export CURL_PROGRESS EXTRA_LOG CURL_PROGRESS_EXTRA
+                export CURL_PROGRESS="-#" EXTRA_LOG="_print_center" CURL_PROGRESS_EXTRA="-#" SUPPORT_ANSI_ESCAPES="true"
             else
                 _print_center() { { [ $# = 3 ] && printf "%s\n" "[ ${2} ]"; } || { printf "%s\n" "[ ${2}${3} ]"; }; }
                 _clear_line() { :; }
@@ -90,7 +89,7 @@ _check_internet() {
 # Result: Read description
 ###################################################
 _clear_line() {
-    printf "\033[%sA\033[2K" "${1}"
+    printf "\e[%sA\e[2K" "${1}"
 }
 
 ###################################################
@@ -130,24 +129,6 @@ _display_time() {
 }
 
 ###################################################
-# Extract ID from a googledrive folder/file url.
-# Globals: None
-# Arguments: 1
-#   ${1} = googledrive folder/file url.
-# Result: print extracted ID
-###################################################
-_extract_id() {
-    [ $# = 0 ] && printf "Missing arguments\n" && return 1
-    LC_ALL=C id_extract_id="${1}"
-    case "${id_extract_id}" in
-        *'drive.google.com'*'id='*) _tmp="${id_extract_id##*id=}" && _tmp="${_tmp%%\?*}" && id_extract_id="${_tmp%%\&*}" ;;
-        *'drive.google.com'*'file/d/'* | 'http'*'docs.google.com'*'/d/'*) _tmp="${id_extract_id##*\/d\/}" && _tmp="${_tmp%%\/*}" && _tmp="${_tmp%%\?*}" && id_extract_id="${_tmp%%\&*}" ;;
-        *'drive.google.com'*'drive'*'folders'*) _tmp="${id_extract_id##*\/folders\/}" && _tmp="${_tmp%%\?*}" && id_extract_id="${_tmp%%\&*}" ;;
-    esac
-    printf "%b" "${id_extract_id:+${id_extract_id}\n}"
-}
-
-###################################################
 # print column size
 # use zsh or stty or tput
 ###################################################
@@ -157,23 +138,6 @@ _get_columns_size() {
         { command -v stty 1>| /dev/null && _tmp="$(stty size)" && printf "%s\n" "${_tmp##* }"; } ||
         { command -v tput 1>| /dev/null && tput cols; } ||
         return 1
-}
-
-###################################################
-# A small function generate final list for folder uploads
-# Globals: 1 variable, 1 function
-#   Variables - DIRIDS
-#   Functions - _dirname
-# Arguments: 1
-#   ${1} = filename
-# Result: read discription
-###################################################
-_gen_final_list() {
-    file_gen_final_list="${1}"
-    rootdir_gen_final_list="$(_dirname "${file_gen_final_list}")"
-    printf "%s\n" "${rootdir_gen_final_list}|:_//_:|$(temp_gen_final_list="$(printf "%s\n" "${DIRIDS}" | grep "|:_//_:|${rootdir_gen_final_list}|:_//_:|" || :)" &&
-        printf "%s\n" "${temp_gen_final_list%%"|:_//_:|${rootdir_gen_final_list}|:_//_:|"}")|:_//_:|${file_gen_final_list}"
-    return 0
 }
 
 ###################################################
@@ -300,7 +264,7 @@ _print_center() {
 _support_ansi_escapes() {
     unset ansi_escapes
     case "${TERM}" in
-        xterm* | rxvt* | urxvt* | linux* | vt*) ansi_escapes="true" ;;
+        xterm* | rxvt* | urxvt* | linux* | vt* | screen*) ansi_escapes="true" ;;
     esac
     { [ -t 2 ] && [ -n "${ansi_escapes}" ] && return 0; } || return 1
 }
@@ -343,8 +307,10 @@ _update_config() {
     [ $# -lt 3 ] && printf "Missing arguments\n" && return 1
     value_name_update_config="${1}" value_update_config="${2}" config_path_update_config="${3}"
     ! [ -f "${config_path_update_config}" ] && : >| "${config_path_update_config}" # If config file doesn't exist.
+    chmod u+w "${config_path_update_config}"
     printf "%s\n%s\n" "$(grep -v -e "^$" -e "^${value_name_update_config}=" "${config_path_update_config}" || :)" \
         "${value_name_update_config}=\"${value_update_config}\"" >| "${config_path_update_config}"
+    chmod a-w-r-x,u+r "${config_path_update_config}"
 }
 
 ###################################################
